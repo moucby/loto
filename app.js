@@ -21,6 +21,11 @@ function charger() {
         d.soiree.cartons ??= [];
         // Partie commencée avant les modes : fictive si ses cartons ont été générés
         d.soiree.mode ??= d.soiree.cartons.some(c => c.serie) ? 'fictif' : 'reel';
+        // Mode fictif : le joueur coche lui-même les numéros tirés (avant : cochés d'office)
+        if (d.soiree.mode === 'fictif') {
+          d.soiree.marques ??= [...(d.soiree.tirage ?? [])];
+          d.soiree.intervalle ??= 10;
+        }
       }
       return d;
     }
@@ -41,6 +46,9 @@ const $ = sel => document.querySelector(sel);
 const carton = id => db.soiree?.cartons.find(c => c.id === id);
 // Cartons du joueur de cet appareil (chez l'organisateur, on écarte ceux des invités)
 const mesCartons = () => db.soiree.cartons.filter(c => !c.joueur);
+// Numéros cochés sur les cartons : en mode réel, ceux qu'on a tapés (= annoncés) ;
+// en mode fictif, ceux que le joueur a tapés parmi les numéros tirés
+const coches = () => new Set(db.soiree.mode === 'fictif' ? db.soiree.marques : db.soiree.tirage);
 const nouvelId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const echapper = s => String(s).replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -179,6 +187,12 @@ let partieDepart = 1;
 let modeDepart = null;
 let nbAGenerer = 6;   // nombre de cartons générés au départ en mode fictif
 let multiDepart = false; // mode fictif : partie à plusieurs, chacun sur son téléphone
+const INTERVALLES = [5, 8, 10, 15, 20, 30]; // secondes entre deux numéros tirés (mode fictif)
+let intervalleDepart = 10;
+const choixIntervalle = (id, valeur) => `
+  <select id="${id}">
+    ${INTERVALLES.map(x => `<option value="${x}" ${x === valeur ? 'selected' : ''}>toutes les ${x} secondes</option>`).join('')}
+  </select>`;
 const modeFictif = () => db.soiree?.mode === 'fictif';
 
 function aller(nom) {
@@ -226,7 +240,11 @@ function rendreAccueil() {
         </label>
         <label class="champ">${multiDepart ? 'Combien de cartons pour toi ? (0 si tu ne fais qu\'organiser)' : 'Combien de cartons ?'}
           <input id="nb-depart" type="number" inputmode="numeric" min="${multiDepart ? 0 : 1}" max="${NB_MAX_GENERES}" value="${nbAGenerer}">
-        </label>` : ''}
+        </label>
+        <label class="champ">Un numéro est tiré
+          ${choixIntervalle('intervalle-depart', intervalleDepart)}
+        </label>
+        <p class="aide">Les numéros sont tirés automatiquement ; à toi de taper ceux qui sont sur tes cartons.</p>` : ''}
       <label class="champ">Commencer au tour
         <select id="partie-depart">
           ${Array.from({ length: NB_PARTIES }, (_, i) => `<option value="${i + 1}" ${i + 1 === partieDepart ? 'selected' : ''}>${i + 1}</option>`).join('')}
@@ -276,6 +294,7 @@ function demarrer() {
     tour: 1,
     tirage: [],
     victoires: [],
+    ...(modeDepart === 'fictif' ? { marques: [], intervalle: intervalleDepart, enPause: false } : {}),
   };
   const fictif = modeDepart === 'fictif';
   if (fictif) genererCartons(nbAGenerer);
@@ -307,8 +326,8 @@ function squeletteJeu() {
       <input id="champ-numero" class="champ-numero" type="text" inputmode="numeric" pattern="[0-9]*"
         maxlength="2" enterkeyhint="go" aria-label="Numéro annoncé" placeholder="Numéro annoncé">
       <button type="submit" class="btn principal ok" data-garde-focus>OK</button>
-      <button type="button" class="btn tirer" data-action="tirer" data-garde-focus
-        aria-label="Tirer un numéro au hasard">🎲<small>Tirer</small></button>
+      <button type="button" class="btn tirer" data-action="pause" data-garde-focus
+        aria-label="Mettre le tirage en pause">⏸<small></small></button>
       <button type="button" class="btn annuler" data-action="annuler" data-garde-focus
         aria-label="Annuler le dernier numéro">↶<small></small></button>
     </form>
@@ -321,8 +340,10 @@ function squeletteJeu() {
 function rendreJeu() {
   if (!$('#champ-numero')) squeletteJeu();
   const s = db.soiree;
-  const sortis = new Set(s.tirage);
-  const dernier = s.tirage.at(-1);
+  const sortis = coches();
+  const dernier = s.tirage.at(-1);               // dernier numéro sorti (la boule)
+  const fictif = modeFictif();
+  const derniereCoche = fictif ? s.marques.at(-1) : dernier;
   const cartons = mesCartons().map(c => ({ c, a: analyser(c, sortis, s.tour) }));
   if (db.prefs.tri) cartons.sort((x, y) => x.a.manque.length - y.a.manque.length);
 
@@ -350,9 +371,7 @@ function rendreJeu() {
     </li>`).join('');
 
   $('#j-multi').innerHTML = barreMulti();
-  // Joueur invité : les numéros viennent de l'organisateur, pas de saisie ici
-  $('#form-saisie').hidden = joueur;
-  $('#j-pave').innerHTML = db.prefs.grille && !joueur ? paveHtml(sortis, dernier) : '';
+  $('#j-pave').innerHTML = db.prefs.grille ? paveHtml(new Set(s.tirage), dernier) : '';
 
   const h = $('#j-histo');
   h.innerHTML = `
@@ -361,19 +380,19 @@ function rendreJeu() {
   h.scrollLeft = h.scrollWidth;
 
   $('#j-cartons').innerHTML = `
-    ${cartons.length ? cartons.map(({ c, a }) => carteJeuHtml(c, a, sortis, dernier)).join('')
+    ${cartons.length ? cartons.map(({ c, a }) => carteJeuHtml(c, a, sortis, derniereCoche)).join('')
       : joueur ? `<div class="vide-jeu"><p class="aide">En attente de tes cartons : ils arrivent dès que tu es connecté à l'organisateur.</p></div>`
       : `<div class="vide-jeu">
           <p class="aide">Aucun carton dans cette partie pour l'instant.</p>
           <button class="btn principal" data-action="gerer-cartons">Ajouter des cartons</button>
         </div>`}`;
 
-  const boutonTirer = $('#form-saisie .tirer');
-  boutonTirer.hidden = !modeFictif();
-  boutonTirer.disabled = s.tirage.length >= 90;
+  // Mode fictif : bouton pause du tirage automatique (l'organisateur seul le pilote)
+  $('#form-saisie .tirer').hidden = !fictif || joueur;
+  majCompteRebours();
   const annul = $('#form-saisie .annuler');
-  annul.disabled = !dernier;
-  annul.querySelector('small').textContent = dernier ?? '';
+  annul.disabled = !derniereCoche;
+  annul.querySelector('small').textContent = derniereCoche ?? '';
   majAffichage();
   animerBoule = false;
 }
@@ -425,17 +444,70 @@ function validerChamp() {
   saisir(n);
 }
 
-// Tirage au sort : un numéro de 1 à 90 pas encore sorti (aucun doublon dans le tour)
+// ---------- Tirage automatique (mode fictif) ----------
+// Un numéro de 1 à 90 pas encore sorti (aucun doublon dans le tour) toutes les X secondes.
+// Il n'est PAS coché d'office : le joueur doit le taper, comme en salle.
+let prochainTirage = null; // horodatage du prochain numéro
+
 function tirer() {
   const s = db.soiree;
-  if (!s || !modeFictif()) return;
-  const restants = Array.from({ length: 90 }, (_, i) => i + 1).filter(n => !s.tirage.includes(n));
-  if (!restants.length) return signaler('Les 90 numéros sont sortis', 'neutre');
+  if (!s || !modeFictif() || estJoueur()) return;
+  const restants = TOUS_LES_NUMEROS.filter(n => !s.tirage.includes(n));
+  if (!restants.length) return;
   const hasard = new Uint32Array(1);
   crypto.getRandomValues(hasard);
   const n = restants[hasard[0] % restants.length];
+  s.tirage.push(n);
+  sauver(); // à plusieurs : envoie le numéro aux joueurs
   annoncer(n);
-  saisir(n);
+  navigator.vibrate?.(15);
+  animerBoule = true;
+  rendre();
+}
+
+// Le tirage tourne sur l'écran de jeu ; il s'arrête en pause, pendant l'annonce d'une victoire,
+// et quand les 90 numéros sont sortis
+function tirageEnCours() {
+  const s = db.soiree;
+  return !!s && modeFictif() && !estJoueur() && !s.enPause && s.tirage.length < 90
+    && ecran === 'jeu' && !$('#alerte').open;
+}
+
+setInterval(() => {
+  if (!tirageEnCours()) {
+    prochainTirage = null;
+  } else {
+    const maintenant = Date.now();
+    prochainTirage ??= maintenant + db.soiree.intervalle * 1000;
+    if (maintenant >= prochainTirage) {
+      prochainTirage = maintenant + db.soiree.intervalle * 1000;
+      tirer();
+    }
+  }
+  majCompteRebours();
+}, 250);
+
+function majCompteRebours() {
+  const b = $('#form-saisie .tirer');
+  const s = db.soiree;
+  if (!b || b.hidden || !s) return;
+  const fini = s.tirage.length >= 90;
+  b.disabled = fini;
+  b.firstChild.textContent = s.enPause ? '▶' : '⏸';
+  b.setAttribute('aria-label', s.enPause ? 'Reprendre le tirage' : 'Mettre le tirage en pause');
+  b.querySelector('small').textContent = fini ? 'Fini'
+    : s.enPause ? 'Pause'
+    : prochainTirage ? `${Math.max(0, Math.ceil((prochainTirage - Date.now()) / 1000))} s` : '…';
+}
+
+function basculerPause() {
+  const s = db.soiree;
+  if (!s || !modeFictif() || estJoueur()) return;
+  s.enPause = !s.enPause;
+  prochainTirage = null;
+  sauver();
+  majCompteRebours();
+  signaler(s.enPause ? 'Tirage en pause' : 'Tirage repris', 'neutre');
 }
 
 // ---------- Son (annonce vocale + musique de victoire) : coupé par défaut ----------
@@ -488,7 +560,7 @@ function carteJeuHtml(c, a, sortis, dernier) {
     const cls = ['case'];
     if (sortis.has(n)) cls.push('coche');
     if (a.lignes[i].manque.length === 0) cls.push('ligne-ok');
-    if (n === dernier) cls.push('dernier');
+    if (n === dernier && sortis.has(n)) cls.push('dernier');
     return `<span class="${cls.join(' ')}">${n}</span>`;
   }).join('')).join('');
 
@@ -518,15 +590,24 @@ function carteJeuHtml(c, a, sortis, dernier) {
 function saisir(n) {
   const s = db.soiree;
   debloquerSon();
-  if (!s || estJoueur()) return;
-  if (s.tirage.includes(n)) return signaler(`Le ${n} est déjà sorti`, 'neutre');
-  s.tirage.push(n);
+  if (!s) return;
+  if (modeFictif()) {
+    // On ne coche que ce qui est sorti
+    if (!s.tirage.includes(n)) return signaler(`Le ${n} n'est pas encore sorti`, 'erreur');
+    if (s.marques.includes(n)) return signaler(`Le ${n} est déjà coché`, 'neutre');
+    s.marques.push(n);
+  } else {
+    if (s.tirage.includes(n)) return signaler(`Le ${n} est déjà sorti`, 'neutre');
+    s.tirage.push(n);
+    animerBoule = true;
+  }
   const nouveaux = verifierVictoires();
   sauver();
   navigator.vibrate?.(15);
+  // Partie à plusieurs : le joueur prévient l'organisateur de sa victoire
+  if (estJoueur() && nouveaux.length) signalerVictoires(nouveaux);
 
   const touches = mesCartons().filter(c => c.grille.flat().includes(n)).length;
-  animerBoule = true;
   rendre();
   if (touches) signaler(`${n} ✓ sur ${touches} carton${touches > 1 ? 's' : ''}`, 'ok');
   else signaler(`${n} · aucun de tes cartons`, 'neutre');
@@ -535,13 +616,15 @@ function saisir(n) {
 
 function annuler() {
   const s = db.soiree;
-  if (!s.tirage.length) return;
-  const retire = s.tirage.pop();
+  const liste = modeFictif() ? s.marques : s.tirage;
+  if (!liste.length) return;
+  const retire = liste.pop();
   // Une victoire n'est plus valable si le numéro retiré la provoquait
-  const sortis = new Set(s.tirage);
+  const sortis = coches();
   s.victoires = s.victoires.filter(v => {
     if (v.partie !== s.partie || v.tour !== s.tour) return true;
     const c = carton(v.cartonId);
+    if (c?.joueur) return true; // victoire d'un invité : vérifiée sur son téléphone
     return c && analyser(c, sortis, s.tour).gagne;
   });
   sauver();
@@ -551,9 +634,10 @@ function annuler() {
 
 function verifierVictoires() {
   const s = db.soiree;
-  const sortis = new Set(s.tirage);
+  const sortis = coches();
   const nouveaux = [];
-  for (const c of s.cartons) {
+  // Cartons des invités : chacun coche sur son téléphone et annonce lui-même sa victoire
+  for (const c of mesCartons()) {
     if (!analyser(c, sortis, s.tour).gagne) continue;
     if (s.victoires.some(v => v.partie === s.partie && v.tour === s.tour && v.cartonId === c.id)) continue;
     s.victoires.push({ partie: s.partie, tour: s.tour, cartonId: c.id, heure: new Date().toISOString() });
@@ -574,6 +658,8 @@ function suivant(demander = true) {
     s.partie++;
     s.tour = 1;
     s.tirage = [];
+    if (modeFictif()) s.marques = [];
+    prochainTirage = null;
   } else {
     terminer();
     return;
@@ -608,6 +694,8 @@ function ouvrirOptions() {
   $('#options-contenu').innerHTML = `
     <label class="choix"><input type="checkbox" id="pref-son" ${sonActif() ? 'checked' : ''}>
       <span>Son : annonce vocale des numéros tirés et musique de victoire</span></label>
+    ${modeFictif() && !estJoueur() ? `<label class="champ">Un numéro est tiré
+      ${choixIntervalle('pref-intervalle', db.soiree.intervalle)}</label>` : ''}
     <label class="choix"><input type="checkbox" data-pref="tri" ${db.prefs.tri ? 'checked' : ''}>
       <span>Trier les cartons du plus proche au plus loin de la victoire</span></label>
     <label class="choix"><input type="checkbox" data-pref="grille" ${db.prefs.grille ? 'checked' : ''}>
@@ -638,7 +726,7 @@ function alerter(cartons) {
   }
   // Partie à plusieurs : cartons des invités
   for (const c of cartons.filter(c => c.joueur)) phrases.push(`${nomDuJoueur(c.joueur)} gagne avec « ${c.nom} ».`);
-  afficherAlerte(TOURS[s.tour] + ' !', phrases.join(' '), true, true);
+  afficherAlerte(TOURS[s.tour] + ' !', phrases.join(' '), !estJoueur(), true);
   if (miens.length) document.querySelector(`[data-carton="${miens[0].id}"]`)?.scrollIntoView({ block: 'nearest' });
 }
 
@@ -917,7 +1005,7 @@ const actions = {
   'enregistrer': enregistrer,
   'annuler-edition': () => { arreterImport(); const r = edition.retour; edition = null; aller(r); },
   'annuler': annuler,
-  'tirer': tirer,
+  'pause': basculerPause,
   'suivant': suivant,
   'terminer': terminer,
 };
@@ -932,7 +1020,13 @@ document.addEventListener('click', e => {
 
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.id === 'multi-depart') {
+  if (t.id === 'intervalle-depart') {
+    intervalleDepart = Number(t.value);
+  } else if (t.id === 'pref-intervalle') {
+    db.soiree.intervalle = Number(t.value);
+    prochainTirage = null; // le nouveau rythme s'applique tout de suite
+    sauver();
+  } else if (t.id === 'multi-depart') {
     multiDepart = t.checked;
     if (!multiDepart && !nbAGenerer) nbAGenerer = 6;
     rendre();
@@ -983,7 +1077,7 @@ document.addEventListener('mousedown', e => {
 
 // PC : un chiffre tapé n'importe où sur l'écran de jeu part dans la zone de saisie
 document.addEventListener('keydown', e => {
-  if (!db.soiree || estJoueur() || ecran !== 'jeu' || $('#alerte').open || $('#options').open) return;
+  if (!db.soiree || ecran !== 'jeu' || $('#alerte').open || $('#options').open) return;
   if (e.target.closest?.('input, select, textarea') || e.ctrlKey || e.metaKey || e.altKey) return;
   const champ = $('#champ-numero');
   if (!champ || !/^[0-9]$/.test(e.key)) return;

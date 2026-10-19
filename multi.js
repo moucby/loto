@@ -109,8 +109,10 @@ async function demarrerHote() {
 }
 
 function recevoirHote(conn, m) {
+  if (!estHote()) return;
+  if (m?.type === 'victoire') return recevoirVictoire(conn, m);
+  if (m?.type !== 'rejoindre') return;
   const s = db.soiree;
-  if (!estHote() || m?.type !== 'rejoindre') return;
   const joueurId = String(m.joueurId ?? '').slice(0, 40);
   if (!joueurId) return;
   let joueur = s.joueurs.find(j => j.id === joueurId);
@@ -129,6 +131,26 @@ function recevoirHote(conn, m) {
   sauver(); // envoie l'état à tout le monde, y compris au nouveau venu
   rafraichirMulti();
   if (nouveaux.length) alerter(nouveaux);
+}
+
+// Un joueur annonce une victoire : l'organisateur la vérifie avec les numéros réellement sortis
+function recevoirVictoire(conn, m) {
+  const s = db.soiree;
+  if (m.partie !== s.partie || m.tour !== s.tour) return; // sous-tour déjà terminé
+  const sortis = new Set(s.tirage);
+  const gagnants = [];
+  for (const id of Array.isArray(m.cartonIds) ? m.cartonIds : []) {
+    const c = carton(id);
+    if (!c || c.joueur !== conn.joueurId) continue;
+    if (!analyser(c, sortis, s.tour).gagne) continue;
+    if (s.victoires.some(v => v.partie === s.partie && v.tour === s.tour && v.cartonId === id)) continue;
+    s.victoires.push({ partie: s.partie, tour: s.tour, cartonId: id, heure: new Date().toISOString() });
+    gagnants.push(c);
+  }
+  if (!gagnants.length) return;
+  sauver(); // la victoire part chez tous les joueurs
+  rendre();
+  alerter(gagnants);
 }
 
 function nomDuJoueur(joueurId) {
@@ -222,6 +244,7 @@ async function rejoindre() {
     nom: nom.slice(0, 20),
     nbCartons: bornerJoueur(nbRejoindre),
     cartons: [],
+    marques: [], // numéros que le joueur a cochés lui-même
     partie: 1,
     tour: 1,
     tirage: [],
@@ -282,7 +305,14 @@ function recevoirJoueur(m) {
   const connues = new Set(s.victoires.map(cle));
   const nouveauNumero = !premierEtat && m.partie === s.partie && m.tirage.length === s.tirage.length + 1
     ? m.tirage.at(-1) : null;
-  Object.assign(s, { partie: m.partie, tour: m.tour, tirage: m.tirage, cartons: m.cartons, victoires: m.victoires });
+  // Nouveau tour : on repart avec des cartons vierges
+  if (m.partie !== s.partie) s.marques = [];
+  // Mes victoires pas encore confirmées par l'organisateur : on les garde en attendant
+  const recues = new Set(m.victoires.map(cle));
+  const mesIds = new Set(m.cartons.map(c => c.id));
+  const enAttente = s.victoires.filter(v => !recues.has(cle(v)) && mesIds.has(v.cartonId) && v.partie === m.partie);
+  Object.assign(s, { partie: m.partie, tour: m.tour, tirage: m.tirage, cartons: m.cartons, victoires: [...m.victoires, ...enAttente] });
+  s.marques ??= [];
   sauver();
 
   if (nouveauNumero) {
@@ -296,18 +326,20 @@ function recevoirJoueur(m) {
   if (nouvelles.length) alerterJoueur(nouvelles);
 }
 
+// Victoires des autres joueurs (les miennes, je les ai déjà vues en cochant mes numéros)
 function alerterJoueur(victoires) {
   const s = db.soiree;
-  const miennes = victoires.filter(v => v.joueur === s.joueurId);
   const autres = victoires.filter(v => v.joueur !== s.joueurId);
-  const phrases = [];
-  if (miennes.length) {
-    phrases.push(`Tu gagnes avec ${miennes.length > 1 ? 'les cartons' : 'le carton'} `
-      + miennes.map(v => `« ${v.carton} »`).join(', ') + ' !');
-  }
-  for (const v of autres) phrases.push(`${v.gagnant} gagne avec « ${v.carton} ».`);
-  afficherAlerte(`${TOURS[s.tour]} !`, phrases.join(' '), false, miennes.length > 0);
-  if (miennes.length) document.querySelector(`[data-carton="${miennes[0].cartonId}"]`)?.scrollIntoView({ block: 'nearest' });
+  if (!autres.length) return;
+  const phrases = autres.map(v => `${v.gagnant} gagne avec « ${v.carton} ».`);
+  afficherAlerte(`${TOURS[s.tour]} !`, phrases.join(' '), false, false);
+}
+
+// Le joueur a gagné en cochant ses numéros : il prévient l'organisateur, qui vérifie et l'annonce à tous
+function signalerVictoires(cartons) {
+  const s = db.soiree;
+  if (!liaison?.open) return;
+  liaison.send({ type: 'victoire', partie: s.partie, tour: s.tour, cartonIds: cartons.map(c => c.id) });
 }
 
 function deconnecter() {

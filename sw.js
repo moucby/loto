@@ -1,7 +1,7 @@
 // Fonctionnement hors ligne : on répond depuis le cache, puis on le met à jour en arrière-plan
 // Les fichiers de lecture des photos (vendor/tesseract, ~11 Mo) ne sont pas préchargés :
 // ils entrent dans le cache au premier scan, puis marchent hors ligne.
-const CACHE = 'loto-v20';
+const CACHE = 'loto-v21';
 const FICHIERS = [
   './', 'index.html', 'styles.css', 'app.js', 'scan.js', 'multi.js', 'manifest.webmanifest', 'icon.svg',
   'fonts/alfa-slab-one.woff2', 'fonts/atkinson-400.woff2', 'fonts/atkinson-700.woff2',
