@@ -1,0 +1,14 @@
+{
+  "name": "Loto – Mes cartons",
+  "short_name": "Loto",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d3b2e",
+  "theme_color": "#072419",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

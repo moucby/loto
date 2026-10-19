@@ -1,0 +1,9 @@
+# Outils de l'assistant de développement (pas l'appli)
+skills/
+
+# Documents de travail
+*.pdf
+
+# Système
+Thumbs.db
+.DS_Store

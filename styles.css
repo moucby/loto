@@ -1,0 +1,577 @@
+/* ==========================================================
+   Loto — esprit « salle des fêtes » :
+   tapis de feutre vert, cartons en papier crème, pions rouges.
+   ========================================================== */
+
+@font-face {
+  font-family: "Affiche";
+  src: url(fonts/alfa-slab-one.woff2) format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Lisible";
+  src: url(fonts/atkinson-400.woff2) format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Lisible";
+  src: url(fonts/atkinson-700.woff2) format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  --feutre: #0d3b2e;
+  --feutre-fonce: #072419;
+  --feutre-clair: #17573f;
+  --feutre-bord: rgba(246, 239, 220, .14);
+  --creme: #f6efdc;
+  --creme-doux: #a8c3b5;
+  --papier: #fbf4e2;
+  --papier-vide: #eadcb7;
+  --papier-hachure: #e0cf9f;
+  --encre: #1c1a17;
+  --rouge: #d62828;
+  --rouge-fonce: #9d1919;
+  --or: #f4b63f;
+  --or-fonce: #b8801b;
+  --vert-ok: #7fd8a4;
+  --h-entete: 56px;
+  --affiche: "Affiche", "Rockwell", Georgia, serif;
+  --lisible: "Lisible", "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html { overflow-x: clip; }
+html, body { margin: 0; }
+body {
+  min-height: 100dvh;
+  color: var(--creme);
+  font-family: var(--lisible);
+  font-size: 17px;
+  line-height: 1.35;
+  -webkit-tap-highlight-color: transparent;
+  background:
+    radial-gradient(120% 80% at 50% 0%, #145a43 0%, transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E"),
+    var(--feutre);
+  background-attachment: fixed;
+}
+button, input, select { font: inherit; color: inherit; }
+button { touch-action: manipulation; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--or); outline-offset: 2px; }
+
+/* ---------- Barre du haut ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  height: calc(var(--h-entete) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) 14px 0;
+  background: rgba(7, 36, 25, .92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--feutre-bord);
+}
+.topbar h1 {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0; font-family: var(--affiche); font-weight: 400; font-size: 1.5rem;
+  letter-spacing: .04em; color: var(--or);
+}
+.topbar h1::before {
+  content: ""; width: 18px; height: 18px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff7070, var(--rouge) 55%, var(--rouge-fonce));
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .35);
+}
+.topbar-droite { display: flex; align-items: center; gap: 8px; }
+.topbar-droite { gap: 6px; }
+.bouton-rond {
+  width: 40px; height: 40px; padding: 0; border-radius: 50%; flex: none;
+  border: 1px solid var(--feutre-bord); background: var(--feutre-clair); color: var(--creme);
+  font-size: 1.2rem; line-height: 1;
+}
+.bouton-rond:active { background: var(--or); color: var(--encre); }
+.bouton-son.actif { background: var(--or); border-color: var(--or); }
+/* Petits écrans : on garde le logo (la boule rouge) et on retire le mot « Loto » */
+@media (max-width: 359px) {
+  .topbar { padding-inline: 10px; }
+  .topbar h1 { font-size: 0; }
+  .topbar nav button { padding: 7px 11px; }
+}
+.topbar nav {
+  display: flex; padding: 3px; gap: 2px; border-radius: 999px;
+  background: var(--feutre-fonce); border: 1px solid var(--feutre-bord);
+}
+.topbar nav button {
+  border: 0; background: none; color: var(--creme-doux);
+  padding: 7px 14px; border-radius: 999px; font-weight: 700; font-size: .95rem; white-space: nowrap;
+}
+.topbar nav button.actif { background: var(--creme); color: var(--encre); }
+
+main { max-width: 1180px; margin: 0 auto; }
+
+/* ---------- Éléments communs ---------- */
+.panneau { padding: 20px 16px 32px; max-width: 920px; margin: 0 auto; }
+.panneau h2 {
+  margin: 0 0 6px; font-family: var(--affiche); font-weight: 400;
+  font-size: 1.9rem; letter-spacing: .01em; color: var(--creme);
+}
+.entete { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.entete h2 { margin: 0; }
+.aide { color: var(--creme-doux); margin: 0 0 16px; }
+
+.btn {
+  min-height: 50px; padding: 0 18px;
+  border-radius: 14px; border: 2px solid var(--feutre-bord);
+  background: var(--feutre-clair); color: var(--creme);
+  font-weight: 700; white-space: nowrap; box-shadow: 0 3px 0 var(--feutre-fonce);
+  transition: transform .08s, box-shadow .08s;
+}
+.btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--feutre-fonce); }
+.btn.principal { background: var(--or); border-color: var(--or); color: var(--encre); box-shadow: 0 3px 0 var(--or-fonce); }
+.btn.danger { background: transparent; color: #ffb3a8; border-color: rgba(255, 120, 100, .4); box-shadow: none; }
+.btn:disabled { opacity: .35; cursor: default; }
+.btn.large { width: 100%; font-size: 1.15rem; min-height: 58px; }
+.ligne-btn { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+
+.champ { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; font-weight: 700; }
+.champ input, .champ select {
+  min-height: 52px; padding: 0 14px; border-radius: 12px;
+  border: 2px solid var(--papier-hachure); background: var(--papier); color: var(--encre);
+  font-size: 1.2rem; font-weight: 700; letter-spacing: .02em;
+}
+.champ input::placeholder { color: #a79a78; font-weight: 400; }
+.champ select { appearance: auto; }
+.erreur { color: #ffb3a8; font-weight: 400; font-size: .92rem; min-height: 1.2em; }
+
+.choix-cartons { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(170px, 100%), 1fr)); gap: 10px; }
+.choix {
+  display: flex; align-items: center; gap: 12px; min-height: 54px;
+  padding: 10px 14px; border-radius: 12px;
+  background: rgba(246, 239, 220, .06); border: 2px solid var(--feutre-bord);
+  font-weight: 700; cursor: pointer;
+}
+.choix:has(input:checked) { background: var(--papier); color: var(--encre); border-color: var(--papier); }
+.choix input { width: 22px; height: 22px; accent-color: var(--rouge); flex: none; margin: 0; }
+
+.badge {
+  font-size: .78rem; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+  background: var(--rouge); color: #fff; letter-spacing: .03em; text-transform: uppercase;
+}
+.badge.serie { background: var(--encre); color: var(--or); font-family: var(--lisible); }
+
+/* ---------- Carton (3 × 9) façon carton imprimé ---------- */
+.grille {
+  container-type: inline-size;
+  display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 1px;
+  background: var(--encre); border: 2px solid var(--encre); border-radius: 4px;
+  overflow: hidden;
+}
+.case {
+  position: relative; isolation: isolate; min-width: 0;
+  display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 1 / 1;
+  background: var(--papier); color: var(--encre);
+  font-weight: 700; font-size: 1.15rem; font-size: clamp(.9rem, 5.4cqi, 1.9rem);
+  font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+}
+.case.vide {
+  background: repeating-linear-gradient(135deg, var(--papier-vide) 0 5px, var(--papier-hachure) 5px 7px);
+}
+/* Le pion posé sur un numéro sorti */
+.case.coche { color: #fff; }
+.case.coche::before {
+  content: ""; position: absolute; inset: 8%; z-index: -1; border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #ff7a7a 0%, var(--rouge) 52%, var(--rouge-fonce) 100%);
+  box-shadow: inset 0 -2px 3px rgba(0, 0, 0, .3), 0 1px 2px rgba(0, 0, 0, .35);
+  opacity: .93;
+}
+/* Ligne complète : les pions deviennent dorés */
+.case.coche.ligne-ok { color: var(--encre); }
+.case.coche.ligne-ok::before {
+  background: radial-gradient(circle at 34% 28%, #ffe29a 0%, var(--or) 52%, var(--or-fonce) 100%);
+}
+.case.dernier::before { animation: pose .45s cubic-bezier(.2, 1.6, .4, 1); }
+.case.dernier::after {
+  content: ""; position: absolute; inset: 2%; border-radius: 50%;
+  border: 3px solid var(--rouge); animation: onde 1.4s ease-out 2;
+  opacity: 0;
+}
+
+@keyframes pose { from { transform: scale(1.8); opacity: 0; } }
+@keyframes onde { from { transform: scale(.7); opacity: 1; } to { transform: scale(1.25); opacity: 0; } }
+
+/* ---------- Mes cartons ---------- */
+.liste-cartons { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: 18px; }
+.carton-fiche, .carton-jeu {
+  background: var(--papier); color: var(--encre);
+  border-radius: 12px; padding: 8px 8px 10px;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, .28), 0 12px 24px rgba(0, 0, 0, .18);
+}
+.carton-fiche { animation: monte .4s ease-out both; }
+.carton-fiche:nth-child(2) { animation-delay: .05s; }
+.carton-fiche:nth-child(3) { animation-delay: .1s; }
+.carton-fiche:nth-child(n+4) { animation-delay: .15s; }
+.carton-fiche header {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin: 2px 4px 8px; font-family: var(--affiche); font-size: 1.1rem;
+}
+.carton-fiche .ligne-btn { margin: 10px 0 0; }
+.carton-fiche .btn { min-height: 44px; flex: 1; }
+.carton-fiche .btn:not(.danger) { background: var(--encre); border-color: var(--encre); box-shadow: none; }
+.carton-fiche .btn.danger { color: var(--rouge-fonce); border-color: rgba(157, 25, 25, .35); }
+.carton-fiche .btn-partie { flex-basis: 100%; }
+.carton-fiche .btn.principal { background: var(--or); border-color: var(--or); color: var(--encre); }
+.carton-fiche .btn-partie:not(.principal) { background: transparent; border-color: rgba(28, 26, 23, .3); color: var(--encre); }
+
+.apercu { margin-top: 10px; }
+
+/* Nouvelle partie : générer les cartons ou les saisir */
+.question { margin: 18px 0 10px; font-weight: 700; }
+.choix-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mode {
+  display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left;
+  padding: 14px; border-radius: 14px; border: 2px solid var(--feutre-bord);
+  background: rgba(246, 239, 220, .06); color: var(--creme);
+}
+.mode b { font-size: 1.05rem; }
+.mode span { color: var(--creme-doux); font-size: .9rem; }
+.mode.actif { background: var(--papier); border-color: var(--or); color: var(--encre); box-shadow: 0 0 0 3px rgba(244, 182, 63, .35); }
+.mode.actif span { color: #6b6150; }
+
+/* Générer des cartons dans la partie : nombre + bouton sur une ligne */
+.generer { display: flex; align-items: flex-end; gap: 10px; }
+.generer .champ { flex: 1; margin: 0; }
+.generer .btn { min-height: 52px; }
+.case.douteux { background: #ffc078; box-shadow: inset 0 0 0 3px #e8590c; }
+
+/* ---------- Scan d'un carton ---------- */
+.btn.scanner { width: 100%; margin: 4px 0 14px; }
+.photo-scan { margin: 4px 0 14px; }
+.photo-scan img { display: block; width: 100%; border-radius: 8px; border: 2px solid var(--papier); }
+.photo-scan figcaption { margin-top: 8px; color: var(--creme); font-weight: 700; }
+
+.zone-photo {
+  position: relative; user-select: none; -webkit-user-select: none;
+  border-radius: 10px; overflow: visible; background: #000;
+}
+.zone-photo img { display: block; width: 100%; border-radius: 10px; pointer-events: none; }
+.zone-photo svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.zone-photo line { stroke: var(--or); stroke-width: 1.5; opacity: .9; }
+.zone-photo line.bord { stroke: var(--rouge); stroke-width: 3; opacity: 1; }
+.poignee {
+  position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px;
+  border-radius: 50%; border: 3px solid var(--or); background: transparent;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, .5); touch-action: none; cursor: grab; z-index: 2;
+}
+.poignee::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px;
+  border-radius: 50%; background: var(--rouge);
+}
+.loupe {
+  position: absolute; width: 110px; height: 110px; z-index: 3; pointer-events: none;
+  border-radius: 50%; border: 3px solid var(--or); background-repeat: no-repeat; background-color: #000;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .5);
+}
+.loupe::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px;
+  border: 2px solid var(--rouge); border-radius: 50%;
+}
+.alerte-fichier {
+  margin: 0 0 12px; padding: 10px 12px; border-radius: 10px;
+  background: #ffe3e3; color: var(--rouge-fonce); font-weight: 700;
+}
+.badge-import {
+  display: inline-block; margin: 0 0 10px; padding: 3px 12px; border-radius: 999px;
+  background: var(--or); color: var(--encre); font-weight: 700; font-size: .9rem;
+}
+.scan-etat { min-height: 1.4em; margin: 12px 0; color: var(--creme); font-weight: 700; }
+
+@keyframes monte { from { opacity: 0; transform: translateY(12px); } }
+
+/* ==========================================================
+   Écran de jeu
+   ========================================================== */
+body.mode-jeu { overflow: hidden; }
+#ecran-jeu {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto auto auto minmax(0, 1fr);
+  grid-template-areas: "statut" "etapes" "multi" "saisie" "pave" "histo" "cartons";
+  height: calc(100dvh - var(--h-entete) - env(safe-area-inset-top));
+}
+
+/* Statut : partie, tour, boule du dernier numéro */
+.statut {
+  grid-area: statut;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px 4px;
+}
+.infos { flex: 1; min-width: 0; }
+.partie { font-family: var(--affiche); font-size: 1.35rem; line-height: 1.1; white-space: nowrap; }
+@media (max-width: 359px) {
+  .statut { gap: 6px; padding-inline: 10px; }
+  .partie { font-size: 1.1rem; }
+  .btn.suivant { padding: 4px 8px; font-size: .82rem; }
+}
+.partie span { color: var(--creme-doux); font-size: .95rem; }
+.sous-titre { color: var(--creme-doux); font-size: .9rem; margin-top: 2px; white-space: nowrap; }
+
+/* Les 3 sous-tours du tour en cours */
+.etapes {
+  grid-area: etapes;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
+  list-style: none; margin: 0; padding: 6px 14px 0;
+}
+.etapes li {
+  padding: 7px 4px; border-radius: 10px; text-align: center;
+  font-weight: 700; font-size: .86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: rgba(246, 239, 220, .06); border: 2px solid var(--feutre-bord); color: var(--creme-doux);
+}
+.etapes li.actuel { background: var(--or); border-color: var(--or); color: var(--encre); box-shadow: 0 3px 0 var(--or-fonce); }
+.etapes li.passe { opacity: .5; text-decoration: line-through; }
+.etapes li.passe.gagne { opacity: 1; text-decoration: none; border-color: var(--or); color: var(--or); }
+.btn.suivant {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 52px; padding: 4px 12px; line-height: 1.1; font-size: .9rem;
+  background: transparent; box-shadow: none; border-color: rgba(246, 239, 220, .35);
+}
+.btn.suivant small { color: var(--or); font-size: .85rem; }
+
+.boule {
+  flex: none; display: grid; place-items: center;
+  width: 70px; height: 70px; border-radius: 50%;
+  background: radial-gradient(circle at 32% 26%, #fff 0%, var(--papier) 38%, #d8c69a 100%);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .35), inset 0 -4px 8px rgba(0, 0, 0, .15);
+}
+.boule span {
+  display: grid; place-items: center; width: 50px; height: 50px; border-radius: 50%;
+  border: 4px solid var(--rouge); color: var(--encre);
+  font-family: var(--affiche); font-size: 1.65rem; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.boule.vide span { color: #b3a37a; border-color: #cdbb8d; }
+.boule.roule { animation: roule .55s cubic-bezier(.25, 1.3, .5, 1); }
+@keyframes roule { from { transform: translateX(-60px) rotate(-260deg); opacity: 0; } }
+
+/* Historique du tirage */
+.historique {
+  grid-area: histo;
+  display: flex; align-items: center; gap: 6px; overflow-x: auto; white-space: nowrap;
+  padding: 6px 14px 8px; scrollbar-width: none;
+}
+.historique::-webkit-scrollbar { display: none; }
+.historique .compte { color: var(--creme-doux); font-size: .85rem; margin-right: 2px; }
+.h-num {
+  flex: none; min-width: 32px; padding: 3px 7px; text-align: center;
+  border-radius: 999px; background: rgba(246, 239, 220, .1); border: 1px solid var(--feutre-bord);
+  font-weight: 700; font-size: .92rem; font-variant-numeric: tabular-nums;
+}
+.h-num:last-child { background: var(--rouge); border-color: var(--rouge); color: #fff; }
+
+/* Cartons en jeu */
+.cartons-jeu {
+  grid-area: cartons; overflow-y: auto; overscroll-behavior: contain;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 1fr));
+  align-content: start; gap: 16px; padding: 6px 14px 18px;
+}
+.carton-jeu { border: 3px solid transparent; transition: border-color .2s; }
+/* Nom à gauche, « Il manque » à droite — qui passe dessous si le nom est long */
+.carton-jeu header {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: 10px;
+  margin: 0 18px 6px 4px;
+}
+.carton-jeu .nom {
+  flex: 1 1 auto; min-width: 0;
+  font-family: var(--affiche); font-size: 1.05rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.carton-jeu .etat { flex: none; color: #6b6150; font-size: .92rem; }
+.carton-jeu .etat b { color: var(--encre); font-variant-numeric: tabular-nums; }
+/* Pastille ✕ dans le coin du carton : retirer de la soirée */
+.carton-jeu { position: relative; }
+.carton-jeu .retirer {
+  position: absolute; top: -9px; right: -9px; z-index: 1;
+  width: 28px; height: 28px; padding: 0;
+  border: 2px solid var(--papier); border-radius: 50%;
+  background: var(--feutre-fonce); color: var(--creme);
+  font-size: .8rem; line-height: 1;
+}
+.carton-jeu .retirer:active { background: var(--rouge); }
+.vide-jeu { grid-column: 1 / -1; padding: 24px 0; text-align: center; }
+.btn.pousse { margin-left: auto; }
+
+.palmares {
+  margin: -2px 4px 6px; font-size: .85rem; font-weight: 700; color: var(--or-fonce);
+}
+.carton-jeu.presque { border-color: var(--rouge); }
+.carton-jeu.presque .etat { color: var(--rouge-fonce); font-weight: 700; }
+.carton-jeu.presque .etat b { color: var(--rouge); font-size: 1.05rem; }
+.carton-jeu.gagnant {
+  border-color: var(--or);
+  box-shadow: 0 5px 0 var(--or-fonce), 0 0 0 4px rgba(244, 182, 63, .35), 0 0 36px rgba(244, 182, 63, .55);
+  animation: brille 1.6s ease-in-out infinite alternate;
+}
+.ruban {
+  display: inline-block; padding: 3px 12px; border-radius: 4px;
+  background: var(--encre); color: var(--or);
+  font-family: var(--affiche); font-size: 1rem; letter-spacing: .03em;
+  transform: rotate(-3deg);
+}
+@keyframes brille { to { box-shadow: 0 5px 0 var(--or-fonce), 0 0 0 6px rgba(244, 182, 63, .5), 0 0 54px rgba(244, 182, 63, .8); } }
+
+
+/* Zone de saisie */
+/* En haut de l'écran, pour que le clavier du téléphone ne la cache jamais */
+.saisie {
+  grid-area: saisie;
+  display: flex; gap: 8px; margin: 0; padding: 10px 14px 2px;
+}
+.champ-numero {
+  flex: 1; min-width: 0; height: 62px; padding: 0 12px;
+  border-radius: 14px; border: 3px solid var(--papier-hachure);
+  background: var(--papier); color: var(--encre); caret-color: var(--rouge);
+  font-family: var(--affiche); font-size: 2.4rem; text-align: center; letter-spacing: .08em;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, .18);
+}
+.champ-numero:focus {
+  outline: none; border-color: var(--or);
+  box-shadow: 0 0 0 4px rgba(244, 182, 63, .35), inset 0 2px 6px rgba(0, 0, 0, .18);
+}
+/* Champ vide : on passe en petit texte pour que l'aide / le retour soit bien centré */
+.champ-numero:placeholder-shown { font-family: var(--lisible); font-size: 1.05rem; font-weight: 700; letter-spacing: 0; }
+.champ-numero::placeholder { color: #8c7f62; opacity: 1; }
+.champ-numero[data-retour="ok"]::placeholder { color: var(--rouge); }
+.champ-numero[data-retour="erreur"]::placeholder { color: var(--rouge-fonce); }
+.champ-numero.secoue { animation: secoue .35s; }
+@keyframes secoue { 25% { transform: translateX(-8px); } 50% { transform: translateX(7px); } 75% { transform: translateX(-4px); } }
+
+.saisie .ok { flex: none; height: 62px; min-height: 0; padding: 0 14px; font-family: var(--affiche); font-weight: 400; font-size: 1.35rem; }
+.btn.annuler {
+  flex: none; min-width: 58px; height: 62px; min-height: 0; padding: 0 8px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 1.25rem; line-height: 1;
+}
+.btn.annuler small { font-size: .8rem; color: var(--creme-doux); margin-top: 2px; min-height: 1em; }
+.btn.tirer {
+  flex: none; min-width: 58px; height: 62px; min-height: 0; padding: 0 8px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 1.35rem; line-height: 1;
+}
+.btn.tirer small { font-size: .75rem; color: var(--or); margin-top: 3px; }
+@media (max-width: 359px) {
+  .saisie { gap: 5px; padding-inline: 10px; }
+  .saisie .ok { padding: 0 9px; font-size: 1.15rem; }
+  .btn.tirer, .btn.annuler { min-width: 46px; padding: 0 4px; }
+  .champ-numero { padding: 0 6px; }
+  .champ-numero:placeholder-shown { font-size: .9rem; }
+}
+
+/* Grille 1–90 (option) */
+#j-pave { grid-area: pave; padding: 8px 14px 0; }
+#j-pave:empty { display: none; }
+.pave { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; max-width: 640px; }
+.pave .n {
+  height: clamp(28px, 4.3dvh, 42px); min-width: 0; padding: 0;
+  border: none; border-radius: 6px;
+  background: var(--feutre-clair); color: var(--creme);
+  font-weight: 700; font-size: .98rem; font-variant-numeric: tabular-nums;
+}
+.pave .n:active { background: var(--creme); color: var(--encre); }
+.pave .n.sorti { background: var(--rouge); color: #fff; }
+.pave .n.dernier { background: var(--or); color: var(--encre); }
+
+/* Grands écrans : la saisie ne s'étale pas sur toute la largeur */
+@media (min-width: 900px) {
+  .saisie { max-width: 560px; }
+}
+
+/* Petits écrans en hauteur (ou clavier ouvert) : on serre l'en-tête */
+@media (max-height: 680px) {
+  .boule { width: 58px; height: 58px; }
+  .boule span { width: 42px; height: 42px; font-size: 1.35rem; }
+  .champ-numero, .saisie .ok, .btn.annuler, .btn.tirer { height: 54px; }
+}
+
+/* ---------- Alerte de victoire ---------- */
+dialog {
+  border: 0; padding: 0; width: min(92vw, 420px);
+  border-radius: 24px; overflow: hidden; color: var(--encre);
+  background: var(--or);
+  box-shadow: 0 10px 0 var(--or-fonce), 0 30px 80px rgba(0, 0, 0, .6);
+}
+dialog[open] { animation: surgit .45s cubic-bezier(.2, 1.5, .4, 1); }
+dialog::backdrop { background: rgba(4, 23, 15, .78); backdrop-filter: blur(3px); }
+dialog form {
+  padding: 30px 22px 22px; text-align: center;
+  background: repeating-conic-gradient(from 0deg at 50% 38%, rgba(255, 255, 255, .22) 0 9deg, transparent 9deg 18deg);
+}
+
+/* Panneau des options : il monte du bas de l'écran, à portée de pouce */
+dialog.feuille {
+  margin: auto auto 0; width: 100%; max-width: 560px; max-height: 85dvh; overflow-y: auto;
+  border-radius: 22px 22px 0 0; background: var(--feutre-fonce); color: var(--creme);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, .5);
+}
+dialog.feuille[open] { animation: monteFeuille .25s ease-out; }
+dialog.feuille form {
+  background: none; text-align: left;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+}
+dialog.feuille h2 { margin: 0 0 12px; font-family: var(--affiche); font-weight: 400; font-size: 1.5rem; }
+dialog.feuille .choix { margin: 8px 0; color: var(--creme); }
+dialog.feuille .choix:has(input:checked) { color: var(--encre); }
+dialog.feuille .btn.principal { width: 100%; margin-top: 4px; }
+@keyframes monteFeuille { from { transform: translateY(100%); } }
+.alerte-titre {
+  margin: 0 0 10px; font-family: var(--affiche); font-size: clamp(2.4rem, 12vw, 3.4rem); line-height: 1;
+  color: var(--encre); text-shadow: 3px 3px 0 #fff;
+  animation: pulse .6s ease-in-out 4;
+}
+.alerte-texte { margin: 0 0 22px; font-size: 1.2rem; font-weight: 700; }
+dialog .btn { width: 100%; font-size: 1.1rem; box-shadow: none; }
+dialog .btn.principal { font-size: 1.2rem; background: var(--encre); border-color: var(--encre); color: var(--or); }
+dialog .btn.secondaire { margin-top: 10px; min-height: 46px; background: transparent; border-color: rgba(28, 26, 23, .35); color: var(--encre); }
+
+@keyframes pulse { 50% { transform: scale(1.12); } }
+@keyframes surgit { from { transform: scale(.6); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ---------- Partie à plusieurs ---------- */
+#j-multi { grid-area: multi; padding: 8px 14px 0; }
+#j-multi:empty { display: none; }
+.barre-multi {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 12px; border-radius: 12px; font-size: .9rem; text-align: left;
+  background: rgba(246, 239, 220, .07); border: 1px solid var(--feutre-bord); color: var(--creme);
+}
+button.barre-multi { cursor: pointer; }
+.barre-multi b { font-family: var(--affiche); font-weight: 400; letter-spacing: .08em; color: var(--or); }
+.barre-multi .voir { margin-left: auto; color: var(--or); font-weight: 700; white-space: nowrap; }
+.reseau { flex: none; width: 10px; height: 10px; border-radius: 50%; background: #6b7a72; }
+.reseau.en-ligne { background: #51cf66; box-shadow: 0 0 6px #51cf66; }
+.reseau.connexion { background: var(--or); animation: clignote 1s steps(1) infinite; }
+.reseau.introuvable { background: var(--rouge); }
+@keyframes clignote { 50% { opacity: .3; } }
+
+.code-partie {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  margin: 0 0 12px; padding: 12px; border-radius: 14px; background: var(--papier); color: var(--encre);
+}
+.code-partie span { font-size: .85rem; font-weight: 700; color: #6b6150; }
+.code-partie b { font-family: var(--affiche); font-weight: 400; font-size: 2.6rem; letter-spacing: .18em; }
+.lien-partie { margin: 8px 0 14px; font-size: .8rem; color: var(--creme-doux); word-break: break-all; }
+.liste-joueurs { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; }
+.liste-joueurs li {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px;
+  background: rgba(246, 239, 220, .06); border: 1px solid var(--feutre-bord);
+}
+.liste-joueurs li > span:last-child { margin-left: auto; color: var(--creme-doux); font-size: .88rem; text-align: right; }
+
+.panneau.rejoindre { border-top: 1px solid var(--feutre-bord); }

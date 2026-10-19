@@ -1,0 +1,9 @@
+# Fins de ligne normalisées ; les fichiers destinés au serveur Linux gardent LF
+* text=auto
+*.sh text eol=lf
+*.conf text eol=lf
+*.bat text eol=crlf
+
+# Fichiers binaires
+*.gz binary
+*.woff2 binary

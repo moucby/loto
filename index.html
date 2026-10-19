@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#072419">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Loto">
+  <title>Loto</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="preload" href="fonts/alfa-slab-one.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/atkinson-700.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Loto</h1>
+    <div class="topbar-droite">
+      <nav>
+        <button data-nav="jeu">Partie</button>
+        <button data-nav="cartons">Cartons</button>
+      </nav>
+      <button class="bouton-rond bouton-son" data-action="son" aria-label="Activer le son" aria-pressed="false" hidden>🔇</button>
+      <button class="bouton-rond bouton-options" data-action="options" aria-label="Options de la partie" hidden>⚙</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="ecran-accueil" hidden></section>
+    <section id="ecran-jeu" hidden></section>
+    <section id="ecran-cartons" hidden></section>
+    <section id="ecran-edition" hidden></section>
+    <section id="ecran-scan" hidden></section>
+  </main>
+
+  <!-- Import de photos existantes (galerie / fichiers) ; plusieurs à la fois -->
+  <input type="file" id="fichier-photo" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden>
+
+  <dialog id="options" class="feuille" aria-labelledby="options-titre">
+    <form method="dialog">
+      <h2 id="options-titre">Options de la partie</h2>
+      <div id="options-contenu"></div>
+      <button class="btn principal large">Fermer</button>
+    </form>
+  </dialog>
+
+  <dialog id="alerte">
+    <form method="dialog">
+      <p id="alerte-titre" class="alerte-titre"></p>
+      <p id="alerte-texte" class="alerte-texte"></p>
+      <button class="btn principal" value="suivant" id="alerte-suivant">Sous-tour suivant</button>
+      <button class="btn secondaire" value="rester">Rester sur ce sous-tour</button>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+  <script src="scan.js"></script>
+  <script src="multi.js"></script>
+</body>
+</html>
