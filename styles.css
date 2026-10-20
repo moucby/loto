@@ -546,32 +546,151 @@ dialog .btn.secondaire { margin-top: 10px; min-height: 46px; background: transpa
 /* ---------- Partie à plusieurs ---------- */
 #j-multi { grid-area: multi; padding: 8px 14px 0; }
 #j-multi:empty { display: none; }
-.barre-multi {
-  display: flex; align-items: center; gap: 8px; width: 100%;
-  padding: 8px 12px; border-radius: 12px; font-size: .9rem; text-align: left;
-  background: rgba(246, 239, 220, .07); border: 1px solid var(--feutre-bord); color: var(--creme);
+
+/* La table : le code de la partie, puis les joueurs assis autour */
+.table-joueurs {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 6px 6px 6px; border-radius: 16px;
+  background: linear-gradient(180deg, rgba(7, 36, 25, .75), rgba(7, 36, 25, .45));
+  border: 1px solid var(--feutre-bord);
 }
-button.barre-multi { cursor: pointer; }
-.barre-multi b { font-family: var(--affiche); font-weight: 400; letter-spacing: .08em; color: var(--or); }
-.barre-multi .voir { margin-left: auto; color: var(--or); font-weight: 700; white-space: nowrap; }
+.code-puce {
+  flex: none; display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 6px;
+  padding: 6px 10px; border-radius: 12px; text-align: left;
+  background: var(--papier); color: var(--encre); border: 0;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, .3);
+}
+button.code-puce { cursor: pointer; }
+.code-puce .reseau { grid-row: span 2; }
+.code-mini { font-family: var(--affiche); font-size: 1.05rem; letter-spacing: .12em; line-height: 1.1; }
+.code-legende { grid-column: 2; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--rouge-fonce); }
+div.code-puce .code-legende { color: #6b6150; }
+
+.avatars {
+  flex: 1; min-width: 0; display: flex; gap: 6px; margin: 0; padding: 2px 2px 2px 0; list-style: none;
+  overflow-x: auto; scrollbar-width: none;
+}
+.avatars::-webkit-scrollbar { display: none; }
+.avatar { flex: none; width: 52px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.avatar small {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: .7rem; font-weight: 700; color: var(--creme-doux);
+}
+.avatar.moi small { color: var(--or); }
+
+/* Pastille d'un joueur : son initiale sur sa couleur ; point vert s'il est connecté ; étoiles = victoires */
+.pastille {
+  position: relative; flex: none; display: grid; place-items: center;
+  width: 38px; height: 38px; border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, hsl(var(--teinte) 75% 72%), hsl(var(--teinte) 62% 46%) 70%);
+  color: #fff; font-family: var(--affiche); font-size: 1.15rem; text-shadow: 0 1px 2px rgba(0, 0, 0, .45);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .35); filter: grayscale(.85) brightness(.7);
+}
+.pastille.en-ligne { filter: none; }
+.pastille::after {
+  content: ""; position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%;
+  background: #6b7a72; border: 2px solid var(--feutre-fonce);
+}
+.pastille.en-ligne::after { background: #51cf66; }
+.avatar.moi .pastille { outline: 2px solid var(--or); outline-offset: 2px; }
+.gains {
+  position: absolute; top: -6px; right: -8px; padding: 1px 4px; border-radius: 999px;
+  background: var(--or); color: var(--encre); font: 700 .66rem/1.2 var(--lisible); font-style: normal;
+  text-shadow: none; box-shadow: 0 1px 0 var(--or-fonce);
+}
+
+/* Avant le lancement : la salle d'attente */
+.attente {
+  display: flex; align-items: center; gap: 10px; margin: 8px 0 0; padding: 10px 12px;
+  border-radius: 12px; font-size: .92rem; font-weight: 700;
+  background: rgba(244, 182, 63, .12); border: 1px dashed rgba(244, 182, 63, .55); color: var(--creme);
+}
+.attente .btn { flex: none; margin-left: auto; min-height: 42px; padding: 0 14px; }
+.attente.erreur { background: rgba(214, 40, 40, .15); border-color: rgba(214, 40, 40, .6); }
+.sablier {
+  flex: none; width: 16px; height: 16px; border-radius: 50%;
+  border: 3px solid rgba(244, 182, 63, .3); border-top-color: var(--or); animation: tourne 1s linear infinite;
+}
+@keyframes tourne { to { transform: rotate(360deg); } }
+
 .reseau { flex: none; width: 10px; height: 10px; border-radius: 50%; background: #6b7a72; }
 .reseau.en-ligne { background: #51cf66; box-shadow: 0 0 6px #51cf66; }
 .reseau.connexion { background: var(--or); animation: clignote 1s steps(1) infinite; }
 .reseau.introuvable { background: var(--rouge); }
 @keyframes clignote { 50% { opacity: .3; } }
 
-.code-partie {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  margin: 0 0 12px; padding: 12px; border-radius: 14px; background: var(--papier); color: var(--encre);
+/* Billet d'invitation : le code façon ticket, et le QR code à scanner */
+.billet {
+  position: relative; display: grid; grid-template-columns: 1fr auto; align-items: stretch;
+  margin: 0 0 12px; border-radius: 16px; overflow: hidden;
+  background: var(--papier); color: var(--encre); box-shadow: 0 5px 0 rgba(0, 0, 0, .3);
 }
-.code-partie span { font-size: .85rem; font-weight: 700; color: #6b6150; }
-.code-partie b { font-family: var(--affiche); font-weight: 400; font-size: 2.6rem; letter-spacing: .18em; }
-.lien-partie { margin: 8px 0 14px; font-size: .8rem; color: var(--creme-doux); word-break: break-all; }
+.billet::before, .billet::after { /* encoches du ticket */
+  content: ""; position: absolute; left: calc(100% - 132px - 9px); width: 18px; height: 18px; border-radius: 50%;
+  background: var(--feutre-fonce);
+}
+.billet::before { top: -9px; }
+.billet::after { bottom: -9px; }
+.billet-code {
+  display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 14px 16px;
+}
+.billet-code span { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--rouge-fonce); }
+.billet-code b { font-family: var(--affiche); font-weight: 400; font-size: clamp(1.9rem, 9vw, 2.6rem); letter-spacing: .14em; line-height: 1.05; }
+.billet-code small { font-size: .78rem; color: #6b6150; }
+.billet-qr {
+  width: 132px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  padding: 10px; border-left: 2px dashed #cdbb8d;
+}
+.billet-qr svg { width: 104px; height: 104px; display: block; }
+.billet-qr small { font-size: .72rem; color: #6b6150; }
+.qr-attente { font-size: .8rem; color: #6b6150; }
+
+.titre-liste {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin: 16px 0 8px; font-family: var(--affiche); font-weight: 400; font-size: 1.15rem;
+}
+.titre-liste span { font-family: var(--lisible); font-size: .85rem; color: var(--creme-doux); }
 .liste-joueurs { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; }
 .liste-joueurs li {
-  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px;
+  display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 12px;
   background: rgba(246, 239, 220, .06); border: 1px solid var(--feutre-bord);
 }
-.liste-joueurs li > span:last-child { margin-left: auto; color: var(--creme-doux); font-size: .88rem; text-align: right; }
+.liste-joueurs li.moi { border-color: rgba(244, 182, 63, .5); }
+.infos-joueur { display: flex; flex-direction: column; min-width: 0; }
+.infos-joueur b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.infos-joueur span { font-size: .82rem; color: var(--creme-doux); }
+.etat-ligne { margin-left: auto; flex: none; font-size: .78rem; font-weight: 700; color: #8a9a92; }
+.etat-ligne.en-ligne { color: #51cf66; }
 
-.panneau.rejoindre { border-top: 1px solid var(--feutre-bord); }
+/* ---------- Accueil : onglets, trois modes, code à saisir ---------- */
+.onglets {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 0 0 6px; padding: 4px;
+  border-radius: 14px; background: var(--feutre-fonce); border: 1px solid var(--feutre-bord);
+}
+.onglet {
+  min-height: 46px; border: 0; border-radius: 10px; background: transparent;
+  color: var(--creme-doux); font-family: var(--affiche); font-size: 1.05rem;
+}
+.onglet.actif { background: var(--papier); color: var(--encre); box-shadow: 0 3px 0 rgba(0, 0, 0, .3); }
+.choix-mode.trois { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mode .icone { font-size: 1.6rem; line-height: 1; margin-bottom: 4px; color: inherit; }
+@media (max-width: 520px) {
+  /* Sur téléphone : un mode par ligne, icône à gauche */
+  .choix-mode.trois { grid-template-columns: 1fr; }
+  .choix-mode.trois .mode { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: center; }
+  .choix-mode.trois .mode .icone { grid-row: span 2; margin: 0; }
+}
+.reglages-depart { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.reglages-depart .champ { margin-bottom: 0; }
+.code-saisie {
+  text-align: center; text-transform: uppercase;
+  font-family: var(--affiche) !important; font-weight: 400 !important;
+  font-size: 2.2rem !important; letter-spacing: .45em; padding-left: .45em !important;
+}
+.code-saisie::placeholder { letter-spacing: .45em; color: #cdbb8d; }
+.aide.petite { margin-top: 14px; font-size: .85rem; }
+.reglages-depart + .btn, .reglages-depart + .aide { margin-top: 14px; }
+.reglages-depart .champ { justify-content: flex-end; }
+.statut .sous-titre { overflow: hidden; text-overflow: ellipsis; }
+.reglages-depart { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.reglages-depart select { width: 100%; min-width: 0; }

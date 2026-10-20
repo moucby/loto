@@ -145,11 +145,15 @@ function nomSuivant(cartons) {
 
 // Génère n cartons au moment du clic. On complète d'abord une série entamée (avec les numéros
 // qu'elle n'a pas encore distribués), puis on ouvre de nouvelles séries de 6.
+// Les séries sont propres à chaque joueur : ses 6 premiers cartons contiennent à eux seuls
+// les 90 numéros (une série n'est jamais partagée entre l'organisateur et un invité).
 function genererCartons(n, joueur = null) {
   const s = db.soiree;
   while (n > 0) {
     const series = new Map();
-    for (const c of s.cartons) if (c.serie) series.set(c.serie, [...(series.get(c.serie) ?? []), c]);
+    for (const c of s.cartons) {
+      if (c.serie && (c.joueur ?? null) === joueur) series.set(c.serie, [...(series.get(c.serie) ?? []), c]);
+    }
     let serie = null, grilles = null;
     for (const [id, membres] of series) {
       if (membres.length >= 6) continue;
@@ -181,17 +185,23 @@ function numeroSerie(c) {
 let ecran = 'jeu';
 let edition = null;   // carton en cours de saisie
 let partieDepart = 1;
-// Deux modes de partie (choisis au départ, rien par défaut) :
+// Trois façons de jouer (choisies au départ, rien par défaut) :
 // - 'reel'   : en salle, le joueur saisit ses cartons et tape les numéros annoncés ;
-// - 'fictif' : sans salle, l'appli génère les cartons et tire les numéros.
+// - 'fictif' : seul, l'appli génère les cartons et tire les numéros ;
+// - 'multi'  : fictif à plusieurs, chacun sur son téléphone ; cet appareil organise.
+const MODES = [
+  { id: 'reel', icone: '🎟️', titre: 'Mode réel', texte: 'En salle : tu saisis tes cartons et tu tapes les numéros annoncés' },
+  { id: 'fictif', icone: '🎲', titre: 'Fictif, seul', texte: 'L\'appli génère tes cartons et tire les numéros' },
+  { id: 'multi', icone: '👥', titre: 'Fictif, à plusieurs', texte: 'Tu organises, chacun joue sur son téléphone' },
+];
+let ongletAccueil = null; // 'nouvelle' | 'rejoindre'
 let modeDepart = null;
 let nbAGenerer = 6;   // nombre de cartons générés au départ en mode fictif
-let multiDepart = false; // mode fictif : partie à plusieurs, chacun sur son téléphone
 const INTERVALLES = [5, 8, 10, 15, 20, 30]; // secondes entre deux numéros tirés (mode fictif)
 let intervalleDepart = 10;
 const choixIntervalle = (id, valeur) => `
   <select id="${id}">
-    ${INTERVALLES.map(x => `<option value="${x}" ${x === valeur ? 'selected' : ''}>toutes les ${x} secondes</option>`).join('')}
+    ${INTERVALLES.map(x => `<option value="${x}" ${x === valeur ? 'selected' : ''}>${x} secondes</option>`).join('')}
   </select>`;
 const modeFictif = () => db.soiree?.mode === 'fictif';
 
@@ -213,100 +223,113 @@ function rendre() {
   gererVeille(vue === 'jeu');
 }
 
-// ---------- Écran : nouvelle partie (F3) ----------
+// ---------- Écran : accueil (nouvelle partie / rejoindre) ----------
 const NB_MAX_GENERES = 50;
 const borner = n => Math.min(NB_MAX_GENERES, Math.max(0, Math.round(Number(n) || 0)));
 
 function rendreAccueil() {
+  // Arrivé par un lien d'invitation : on ouvre directement « Rejoindre »
+  ongletAccueil ??= codeRejoindre ? 'rejoindre' : 'nouvelle';
+  const nouvelle = ongletAccueil === 'nouvelle';
   $('#ecran-accueil').innerHTML = `
-    <div class="panneau">
-      <h2>Nouvelle partie</h2>
-      <p class="aide">Les cartons appartiennent à la partie : ils sont créés pour elle et supprimés quand elle se termine.</p>
-      <p class="question">Comment joues-tu ?</p>
-      <div class="choix-mode" role="radiogroup">
-        <button class="mode ${modeDepart === 'reel' ? 'actif' : ''}" data-action="mode" data-id="reel"
-          role="radio" aria-checked="${modeDepart === 'reel'}">
-          <b>Mode réel</b><span>En salle : tu saisis tes cartons et tu tapes les numéros annoncés</span>
-        </button>
-        <button class="mode ${modeDepart === 'fictif' ? 'actif' : ''}" data-action="mode" data-id="fictif"
-          role="radio" aria-checked="${modeDepart === 'fictif'}">
-          <b>Mode fictif</b><span>Sans salle : l'appli génère les cartons et tire les numéros</span>
-        </button>
+    <div class="panneau accueil">
+      <div class="onglets" role="tablist">
+        <button role="tab" class="onglet ${nouvelle ? 'actif' : ''}" aria-selected="${nouvelle}"
+          data-action="onglet-accueil" data-id="nouvelle">Nouvelle partie</button>
+        <button role="tab" class="onglet ${nouvelle ? '' : 'actif'}" aria-selected="${!nouvelle}"
+          data-action="onglet-accueil" data-id="rejoindre">Rejoindre</button>
       </div>
-      ${modeDepart === 'fictif' ? `
-        <label class="choix">
-          <input type="checkbox" id="multi-depart" ${multiDepart ? 'checked' : ''}>
-          <span>Jouer à plusieurs, chacun sur son téléphone (tu organises la partie)</span>
+      ${nouvelle ? formulaireNouvelle() : formulaireRejoindre()}
+    </div>`;
+}
+
+function formulaireNouvelle() {
+  const fictif = modeDepart === 'fictif' || modeDepart === 'multi';
+  const multi = modeDepart === 'multi';
+  return `
+    <p class="question">Comment joues-tu ?</p>
+    <div class="choix-mode trois" role="radiogroup">
+      ${MODES.map(m => `
+        <button class="mode ${modeDepart === m.id ? 'actif' : ''}" data-action="mode" data-id="${m.id}"
+          role="radio" aria-checked="${modeDepart === m.id}">
+          <span class="icone" aria-hidden="true">${m.icone}</span>
+          <b>${m.titre}</b><span>${m.texte}</span>
+        </button>`).join('')}
+    </div>
+    ${fictif ? `
+      <div class="reglages-depart">
+        <label class="champ">${multi ? 'Tes cartons' : 'Nombre de cartons'}
+          <input id="nb-depart" type="number" inputmode="numeric" min="${multi ? 0 : 1}" max="${NB_MAX_GENERES}" value="${nbAGenerer}">
         </label>
-        <label class="champ">${multiDepart ? 'Combien de cartons pour toi ? (0 si tu ne fais qu\'organiser)' : 'Combien de cartons ?'}
-          <input id="nb-depart" type="number" inputmode="numeric" min="${multiDepart ? 0 : 1}" max="${NB_MAX_GENERES}" value="${nbAGenerer}">
-        </label>
-        <label class="champ">Un numéro est tiré
+        <label class="champ">Un numéro toutes les
           ${choixIntervalle('intervalle-depart', intervalleDepart)}
         </label>
-        <p class="aide">Les numéros sont tirés automatiquement ; à toi de taper ceux qui sont sur tes cartons.</p>` : ''}
-      <label class="champ">Commencer au tour
-        <select id="partie-depart">
-          ${Array.from({ length: NB_PARTIES }, (_, i) => `<option value="${i + 1}" ${i + 1 === partieDepart ? 'selected' : ''}>${i + 1}</option>`).join('')}
-        </select>
-      </label>
-      <button class="btn principal large" data-action="demarrer" id="btn-demarrer" ${modeDepart ? '' : 'disabled'}>
-        ${libelleDemarrer()}
-      </button>
-    </div>
-    <div class="panneau rejoindre" id="rejoindre">
-      <h2>Rejoindre une partie</h2>
-      <p class="aide">Quelqu'un organise une partie fictive à plusieurs ? Entre son code pour jouer sur ton téléphone.</p>
-      <label class="champ">Code de la partie
-        <input id="code-rejoindre" type="text" maxlength="5" autocapitalize="characters" autocomplete="off"
-          placeholder="ex. K7Q2M" value="${echapper(codeRejoindre)}">
-      </label>
+      </div>
+      <p class="aide">${multi
+        ? 'Mets 0 carton si tu ne fais qu\'organiser. Tu obtiendras un code et un QR code à montrer aux joueurs ; le tirage démarre quand tu lances la partie.'
+        : 'Les numéros sont tirés automatiquement ; à toi de taper ceux qui sont sur tes cartons.'}</p>` : ''}
+    <label class="champ">Commencer au tour
+      <select id="partie-depart">
+        ${Array.from({ length: NB_PARTIES }, (_, i) => `<option value="${i + 1}" ${i + 1 === partieDepart ? 'selected' : ''}>${i + 1}</option>`).join('')}
+      </select>
+    </label>
+    <button class="btn principal large" data-action="demarrer" id="btn-demarrer" ${modeDepart ? '' : 'disabled'}>
+      ${libelleDemarrer()}
+    </button>
+    <p class="aide petite">Les cartons appartiennent à la partie : ils sont créés pour elle et supprimés quand elle se termine.</p>`;
+}
+
+function formulaireRejoindre() {
+  return `
+    <p class="aide">Demande le code à l'organisateur, ou scanne son QR code avec l'appareil photo du téléphone.</p>
+    <label class="champ">Code de la partie
+      <input id="code-rejoindre" class="code-saisie" type="text" maxlength="5" autocapitalize="characters"
+        autocomplete="off" spellcheck="false" placeholder="•••••" value="${echapper(codeRejoindre)}">
+    </label>
+    <div class="reglages-depart">
       <label class="champ">Ton prénom
         <input id="nom-rejoindre" type="text" maxlength="20" autocomplete="given-name" value="${echapper(nomRejoindre)}">
       </label>
-      <label class="champ">Combien de cartons ?
+      <label class="champ">Tes cartons
         <input id="nb-rejoindre" type="number" inputmode="numeric" min="1" max="${NB_MAX_CARTONS_JOUEUR}" value="${nbRejoindre}">
       </label>
-      <button class="btn principal large" data-action="rejoindre">Rejoindre la partie</button>
-    </div>`;
-  // Arrivé par un lien d'invitation : on amène le joueur sur le formulaire
-  if (codeRejoindre) $('#rejoindre').scrollIntoView();
+    </div>
+    <button class="btn principal large" data-action="rejoindre">Rejoindre la partie</button>`;
 }
 
 function libelleDemarrer() {
-  if (modeDepart === 'fictif' && multiDepart) {
-    return nbAGenerer ? `Créer la partie (${nbAGenerer} carton${nbAGenerer > 1 ? 's' : ''} pour toi)` : 'Créer la partie';
-  }
-  if (modeDepart === 'fictif') return `Générer ${nbAGenerer} carton${nbAGenerer > 1 ? 's' : ''} et démarrer`;
+  const n = `${nbAGenerer} carton${nbAGenerer > 1 ? 's' : ''}`;
+  if (modeDepart === 'multi') return nbAGenerer ? `Ouvrir la salle (${n} pour toi)` : 'Ouvrir la salle';
+  if (modeDepart === 'fictif') return `Générer ${n} et démarrer`;
   if (modeDepart === 'reel') return 'Démarrer et saisir mes cartons';
   return 'Choisis d\'abord un mode';
 }
 
 function demarrer() {
-  const multi = modeDepart === 'fictif' && multiDepart;
-  if (!modeDepart || (modeDepart === 'fictif' && !multi && !nbAGenerer)) return;
+  const multi = modeDepart === 'multi';
+  const fictif = modeDepart === 'fictif' || multi;
+  if (!modeDepart || (modeDepart === 'fictif' && !nbAGenerer)) return;
   db.soiree = {
     debut: new Date().toISOString(),
-    mode: modeDepart,
+    mode: fictif ? 'fictif' : 'reel',
     ...(multi ? { role: 'hote', code: genererCode(), joueurs: [] } : {}),
     cartons: [],
     partie: partieDepart,
     tour: 1,
     tirage: [],
     victoires: [],
-    ...(modeDepart === 'fictif' ? { marques: [], intervalle: intervalleDepart, enPause: false } : {}),
+    // À plusieurs, le tirage attend que l'organisateur lance la partie
+    ...(fictif ? { marques: [], intervalle: intervalleDepart, enPause: multi } : {}),
   };
-  const fictif = modeDepart === 'fictif';
-  if (fictif) genererCartons(nbAGenerer);
+  if (fictif && nbAGenerer) genererCartons(nbAGenerer);
   modeDepart = null;
   sauver();
   debloquerSon();
   // Mode réel : on va directement là où le joueur saisit ses cartons
   aller(fictif ? 'jeu' : 'cartons');
   if (multi) {
-    multiDepart = false;
     demarrerHote();
-    ouvrirJoueurs(); // affiche tout de suite le code à communiquer
+    ouvrirJoueurs(); // la salle d'attente : code, QR code, joueurs qui arrivent
   }
 }
 
@@ -694,7 +717,7 @@ function ouvrirOptions() {
   $('#options-contenu').innerHTML = `
     <label class="choix"><input type="checkbox" id="pref-son" ${sonActif() ? 'checked' : ''}>
       <span>Son : annonce vocale des numéros tirés et musique de victoire</span></label>
-    ${modeFictif() && !estJoueur() ? `<label class="champ">Un numéro est tiré
+    ${modeFictif() && !estJoueur() ? `<label class="champ">Un numéro toutes les
       ${choixIntervalle('pref-intervalle', db.soiree.intervalle)}</label>` : ''}
     <label class="choix"><input type="checkbox" data-pref="tri" ${db.prefs.tri ? 'checked' : ''}>
       <span>Trier les cartons du plus proche au plus loin de la victoire</span></label>
@@ -987,7 +1010,12 @@ function enregistrer() {
 // ---------- Événements ----------
 const actions = {
   'demarrer': demarrer,
-  'mode': mode => { modeDepart = mode; rendre(); },
+  'mode': mode => {
+    modeDepart = mode;
+    if (mode !== 'multi' && !nbAGenerer) nbAGenerer = 6; // 0 carton n'a de sens que pour l'organisateur
+    rendre();
+  },
+  'onglet-accueil': onglet => { ongletAccueil = onglet; rendre(); },
   'nouveau-carton': () => ouvrirEdition(null),
   'scanner': () => { ouvrirEdition(null); choisirPhoto(); },
   'choisir-photo': () => choisirPhoto(),
@@ -999,6 +1027,7 @@ const actions = {
   'gerer-cartons': () => { fermerOptions(); aller('cartons'); },
   'options': ouvrirOptions,
   'joueurs': () => ouvrirJoueurs(),
+  'lancer': () => lancerPartie(),
   'partager': () => partager(),
   'rejoindre': () => rejoindre(),
   'son': () => basculerSon(),
@@ -1026,10 +1055,6 @@ document.addEventListener('change', e => {
     db.soiree.intervalle = Number(t.value);
     prochainTirage = null; // le nouveau rythme s'applique tout de suite
     sauver();
-  } else if (t.id === 'multi-depart') {
-    multiDepart = t.checked;
-    if (!multiDepart && !nbAGenerer) nbAGenerer = 6;
-    rendre();
   } else if (t.id === 'pref-son') {
     basculerSon(t.checked);
   } else if (t.id === 'partie-depart') {
@@ -1053,7 +1078,7 @@ document.addEventListener('input', e => {
   } else if (t.id === 'nb-depart') {
     nbAGenerer = borner(t.value);
     $('#btn-demarrer').textContent = libelleDemarrer();
-    $('#btn-demarrer').disabled = !nbAGenerer && !multiDepart;
+    $('#btn-demarrer').disabled = !nbAGenerer && modeDepart !== 'multi';
   } else if (t.id === 'code-rejoindre') {
     t.value = t.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
     codeRejoindre = t.value;

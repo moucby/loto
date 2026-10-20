@@ -55,27 +55,75 @@ function rafraichirMulti() {
   if (panneauJoueurs && $('#options').open) ouvrirJoueurs();
 }
 
+const TEXTE_RESEAU = { 'en-ligne': 'en ligne', connexion: 'connexion…', deconnecte: 'hors ligne', introuvable: 'introuvable' };
+
+// Les membres de la salle : l'organisateur puis les invités, avec leurs victoires.
+// L'organisateur la calcule ; les joueurs la reçoivent avec l'état de la partie.
+function salle() {
+  const s = db.soiree;
+  if (!estHote()) return s.salle ?? [];
+  const gains = joueurId => s.victoires.filter(v => (carton(v.cartonId)?.joueur ?? null) === joueurId).length;
+  return [
+    { id: null, nom: 'Organisateur', enLigne: etatReseau === 'en-ligne', gains: gains(null), cartons: mesCartons().length },
+    ...s.joueurs.map(j => ({
+      id: j.id, nom: j.nom, enLigne: !!connexions.get(j.id)?.open, gains: gains(j.id),
+      cartons: s.cartons.filter(c => c.joueur === j.id).length,
+    })),
+  ];
+}
+
+// Couleur stable pour chaque prénom
+const teinte = nom => [...nom].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 17);
+
+function pastilleHtml(m) {
+  return `
+    <span class="pastille ${m.enLigne ? 'en-ligne' : ''}" style="--teinte:${teinte(m.nom)}">
+      ${m.id === null ? '👑' : echapper(m.nom.charAt(0).toUpperCase())}
+      ${m.gains ? `<i class="gains" title="${m.gains} victoire${m.gains > 1 ? 's' : ''}">★${m.gains > 1 ? m.gains : ''}</i>` : ''}
+    </span>`;
+}
+
+const estMoi = m => (estHote() ? m.id === null : m.id === db.soiree.joueurId);
+const enAttente = () => db.soiree.enPause && !db.soiree.tirage.length;
+
+// Bandeau de l'écran de jeu : le code de la partie et les joueurs autour de la table
 function barreMulti() {
   const s = db.soiree;
   if (!s?.role) return '';
-  const reseau = {
-    'en-ligne': 'en ligne', connexion: 'connexion…', deconnecte: 'hors ligne', introuvable: 'partie introuvable',
-  }[etatReseau];
-  if (estHote()) {
-    const connectes = [...connexions.values()].filter(c => c.open).length;
-    return `
-      <button class="barre-multi" data-action="joueurs">
-        <span class="reseau ${etatReseau}" title="${reseau}"></span>
-        <span>Code <b>${s.code}</b> · ${s.joueurs.length} joueur${s.joueurs.length > 1 ? 's' : ''}
-          (${connectes} connecté${connectes > 1 ? 's' : ''})</span>
-        <span class="voir">Inviter ›</span>
-      </button>`;
-  }
+  const hote = estHote();
+  const membres = salle();
+  const puce = `
+    <span class="reseau ${etatReseau}" title="${TEXTE_RESEAU[etatReseau]}"></span>
+    <span class="code-mini">${s.code}</span>
+    <span class="code-legende">${hote ? 'Inviter' : TEXTE_RESEAU[etatReseau]}</span>`;
+  const attente = !enAttente() ? '' : hote
+    ? `<div class="attente"><span>${membres.length - 1 ? `${membres.length - 1} joueur${membres.length > 2 ? 's' : ''} dans la salle.` : 'La salle est ouverte : en attente des joueurs.'}</span>
+        <button class="btn principal" data-action="lancer">▶ Lancer la partie</button></div>`
+    : '<div class="attente"><span class="sablier" aria-hidden="true"></span><span>En attente du lancement par l\'organisateur…</span></div>';
   return `
-    <div class="barre-multi">
-      <span class="reseau ${etatReseau}"></span>
-      <span>${echapper(s.nom)} · partie <b>${s.code}</b> · ${reseau}${etatReseau === 'introuvable' ? ' (vérifie le code)' : ''}</span>
-    </div>`;
+    <div class="table-joueurs">
+      ${hote ? `<button class="code-puce" data-action="joueurs" aria-label="Inviter des joueurs">${puce}</button>`
+        : `<div class="code-puce">${puce}</div>`}
+      <ul class="avatars" aria-label="Joueurs de la partie">
+        ${membres.map(m => `
+          <li class="avatar ${estMoi(m) ? 'moi' : ''}" title="${echapper(m.nom)}${m.enLigne ? '' : ' (hors ligne)'}">
+            ${pastilleHtml(m)}<small>${estMoi(m) ? 'Toi' : m.id === null ? 'Orga' : echapper(m.nom)}</small>
+          </li>`).join('')}
+      </ul>
+    </div>
+    ${etatReseau === 'introuvable' && !hote ? '<p class="attente erreur">Partie introuvable : vérifie le code avec l\'organisateur.</p>' : attente}`;
+}
+
+// L'organisateur lance le tirage quand tout le monde est là
+function lancerPartie() {
+  const s = db.soiree;
+  if (!estHote()) return;
+  s.enPause = false;
+  prochainTirage = null;
+  sauver();
+  fermerOptions();
+  rendre();
+  signaler('C\'est parti !', 'ok');
 }
 
 // ---------- Organisateur ----------
@@ -91,6 +139,7 @@ async function demarrerHote() {
     conn.on('data', m => recevoirHote(conn, m));
     conn.on('close', () => {
       if (connexions.get(conn.joueurId) === conn) connexions.delete(conn.joueurId);
+      diffuserEtat(); // les autres voient le joueur passer hors ligne
       rafraichirMulti();
     });
   });
@@ -166,6 +215,8 @@ function etatPour(joueurId) {
     partie: s.partie,
     tour: s.tour,
     tirage: s.tirage,
+    enPause: s.enPause,
+    salle: salle().map(({ cartons, ...m }) => m),
     cartons: s.cartons.filter(c => c.joueur === joueurId).map(({ joueur, ...c }) => c),
     victoires: s.victoires.map(v => {
       const c = carton(v.cartonId);
@@ -190,31 +241,50 @@ function finirHote() {
   clearTimeout(relance);
 }
 
+// QR code de l'invitation (bibliothèque qrcode-generator, chargée à la demande)
+function qrInvitation(lien) {
+  if (!window.qrcode) return '<span class="qr-attente">QR code…</span>';
+  const qr = qrcode(0, 'M');
+  qr.addData(lien);
+  qr.make();
+  return qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true, alt: 'QR code pour rejoindre la partie' });
+}
+
+// La salle de jeu : billet d'invitation (code + QR code), lancement, liste des joueurs
 function ouvrirJoueurs() {
   const s = db.soiree;
   if (!estHote()) return;
   const lien = `${location.origin}${location.pathname}?partie=${s.code}`;
-  const sortis = new Set(s.tirage);
-  const lignes = s.joueurs.map(j => {
-    const cs = s.cartons.filter(c => c.joueur === j.id);
-    const manque = cs.length ? Math.min(...cs.map(c => analyser(c, sortis, s.tour).manque.length)) : null;
-    const enLigne = connexions.get(j.id)?.open;
-    const avance = manque === null ? '' : manque === 0 ? ` · ${TOURS[s.tour]} !` : ` · il lui manque ${manque}`;
-    return `
-      <li>
-        <span class="reseau ${enLigne ? 'en-ligne' : 'deconnecte'}" title="${enLigne ? 'connecté' : 'déconnecté'}"></span>
-        <b>${echapper(j.nom)}</b>
-        <span>${cs.length} carton${cs.length > 1 ? 's' : ''}${avance}</span>
-      </li>`;
-  }).join('');
-  $('#options-titre').textContent = 'Joueurs de la partie';
+  if (!window.qrcode) chargerScript('vendor/qrcode.js').then(() => panneauJoueurs && $('#options').open && ouvrirJoueurs()).catch(() => {});
+  const membres = salle();
+  const invites = membres.length - 1;
+  $('#options-titre').textContent = enAttente() ? 'Salle d\'attente' : 'Salle de jeu';
   $('#options-contenu').innerHTML = `
-    <div class="code-partie"><span>Code de la partie</span><b>${s.code}</b></div>
-    <p class="aide">Chaque joueur ouvre l'appli sur son téléphone, choisit « Rejoindre une partie » et tape ce code.
-      Tu peux aussi lui envoyer le lien.</p>
-    <button type="button" class="btn principal" data-action="partager">Partager le lien d'invitation</button>
-    <p class="lien-partie">${echapper(lien)}</p>
-    <ul class="liste-joueurs">${lignes || '<li class="aide">Personne n\'a encore rejoint la partie.</li>'}</ul>`;
+    <div class="billet">
+      <div class="billet-code">
+        <span>Code de la partie</span>
+        <b>${s.code}</b>
+        <small>« Rejoindre » sur l'accueil de l'appli</small>
+      </div>
+      <div class="billet-qr">${qrInvitation(lien)}<small>ou scanner ici</small></div>
+    </div>
+    <div class="ligne-btn">
+      <button type="button" class="btn" data-action="partager">Partager le lien</button>
+      ${enAttente() ? '<button type="button" class="btn principal pousse" data-action="lancer">▶ Lancer la partie</button>' : ''}
+    </div>
+    <h3 class="titre-liste">Joueurs <span>${invites ? `${invites} invité${invites > 1 ? 's' : ''}` : 'en attente…'}</span></h3>
+    <ul class="liste-joueurs">
+      ${membres.map(m => `
+        <li class="${estMoi(m) ? 'moi' : ''}">
+          ${pastilleHtml(m)}
+          <div class="infos-joueur">
+            <b>${estMoi(m) ? 'Toi (organisateur)' : echapper(m.nom)}</b>
+            <span>${m.cartons} carton${m.cartons > 1 ? 's' : ''}${m.gains ? ` · ★ ${m.gains} victoire${m.gains > 1 ? 's' : ''}` : ''}</span>
+          </div>
+          <span class="etat-ligne ${m.enLigne ? 'en-ligne' : ''}">${m.enLigne ? 'en ligne' : 'hors ligne'}</span>
+        </li>`).join('')}
+    </ul>
+    ${invites ? '' : '<p class="aide">Les joueurs apparaissent ici dès qu\'ils rejoignent la partie.</p>'}`;
   panneauJoueurs = true;
   if (!$('#options').open) $('#options').showModal();
 }
@@ -310,8 +380,11 @@ function recevoirJoueur(m) {
   // Mes victoires pas encore confirmées par l'organisateur : on les garde en attendant
   const recues = new Set(m.victoires.map(cle));
   const mesIds = new Set(m.cartons.map(c => c.id));
-  const enAttente = s.victoires.filter(v => !recues.has(cle(v)) && mesIds.has(v.cartonId) && v.partie === m.partie);
-  Object.assign(s, { partie: m.partie, tour: m.tour, tirage: m.tirage, cartons: m.cartons, victoires: [...m.victoires, ...enAttente] });
+  const nonConfirmees = s.victoires.filter(v => !recues.has(cle(v)) && mesIds.has(v.cartonId) && v.partie === m.partie);
+  Object.assign(s, {
+    partie: m.partie, tour: m.tour, tirage: m.tirage, cartons: m.cartons, victoires: [...m.victoires, ...nonConfirmees],
+    enPause: !!m.enPause, salle: Array.isArray(m.salle) ? m.salle : [],
+  });
   s.marques ??= [];
   sauver();
 
